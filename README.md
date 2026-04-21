@@ -2,6 +2,8 @@
 
 An AI-powered task manager built on Cloudflare's developer platform — create, update, and query tasks through natural language chat.
 
+**Live demo:** https://cf-ai-taskflow.alexmekhail.workers.dev
+
 ## Tech Stack
 
 | Layer | Technology |
