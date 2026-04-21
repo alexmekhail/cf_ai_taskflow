@@ -1,0 +1,17 @@
+name = "cf-ai-taskflow"
+compatibility_date = "2026-04-21"
+main = "src/index.ts"
+
+[ai]
+binding = "AI"
+
+[[durable_objects.bindings]]
+name = "TASK_STORE"
+class_name = "TaskDurableObject"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TaskDurableObject"]
+
+[assets]
+directory = "./public"

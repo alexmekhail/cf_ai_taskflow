@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TaskFlow AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0e11;
+      --surface: #13141a;
+      --surface2: #1a1c24;
+      --surface3: #21232e;
+      --border: #2a2d3a;
+      --border2: #353848;
+      --text: #e8eaf0;
+      --text2: #9499b0;
+      --text3: #5c6078;
+      --accent: #6c63ff;
+      --accent-dim: rgba(108, 99, 255, 0.15);
+      --accent-hover: #7d75ff;
+      --green: #22c55e;
+      --green-dim: rgba(34, 197, 94, 0.12);
+      --yellow: #eab308;
+      --yellow-dim: rgba(234, 179, 8, 0.12);
+      --red: #ef4444;
+      --red-dim: rgba(239, 68, 68, 0.12);
+      --blue: #3b82f6;
+      --blue-dim: rgba(59, 130, 246, 0.12);
+      --radius: 10px;
+      --radius-sm: 6px;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    #app {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* LEFT PANEL */
+    #tasks-panel {
+      width: 40%;
+      min-width: 300px;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .panel-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, var(--accent), #9b8fff);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .panel-title h1 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+
+    .panel-title span {
+      font-size: 11px;
+      color: var(--text3);
+      font-weight: 400;
+    }
+
+    .clear-btn {
+      font-size: 11px;
+      color: var(--text3);
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 4px 10px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+    .clear-btn:hover { color: var(--red); border-color: var(--red); background: var(--red-dim); }
+
+    #tasks-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 16px 20px;
+    }
+    #tasks-list::-webkit-scrollbar { width: 4px; }
+    #tasks-list::-webkit-scrollbar-track { background: transparent; }
+    #tasks-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+    .task-group { margin-bottom: 20px; }
+
+    .group-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      padding: 0 4px;
+    }
+
+    .group-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .dot-todo { background: var(--text3); }
+    .dot-progress { background: var(--blue); }
+    .dot-done { background: var(--green); }
+
+    .group-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text3);
+    }
+
+    .group-count {
+      font-size: 11px;
+      color: var(--text3);
+      background: var(--surface3);
+      border-radius: 10px;
+      padding: 1px 7px;
+      margin-left: auto;
+    }
+
+    .task-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      margin-bottom: 6px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .task-card:hover { border-color: var(--border2); background: var(--surface3); }
+    .task-card.expanded { border-color: var(--accent); }
+
+    .task-card-top { display: flex; align-items: flex-start; gap: 10px; }
+
+    .task-status-btn {
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      border: 1.5px solid var(--border2);
+      background: none;
+      cursor: pointer;
+      flex-shrink: 0;
+      margin-top: 2px;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .task-status-btn.done { background: var(--green); border-color: var(--green); }
+    .task-status-btn.done::after { content: '✓'; font-size: 9px; color: #000; font-weight: 700; }
+    .task-status-btn.in-progress { border-color: var(--blue); }
+    .task-status-btn.in-progress::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--blue); display: block; }
+    .task-status-btn:hover:not(.done) { border-color: var(--accent); }
+
+    .task-content { flex: 1; min-width: 0; }
+
+    .task-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .task-card.done-card .task-title { text-decoration: line-through; color: var(--text3); }
+
+    .task-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+    .priority-badge {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      padding: 2px 7px;
+      border-radius: 4px;
+      text-transform: uppercase;
+    }
+    .priority-high { background: var(--red-dim); color: var(--red); }
+    .priority-medium { background: var(--yellow-dim); color: var(--yellow); }
+    .priority-low { background: var(--green-dim); color: var(--green); }
+
+    .due-date { font-size: 11px; color: var(--text3); }
+    .due-date.overdue { color: var(--red); }
+
+    .task-expand {
+      display: none;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+    .task-card.expanded .task-expand { display: block; }
+
+    .task-desc { font-size: 12px; color: var(--text2); margin-bottom: 10px; line-height: 1.6; }
+
+    .status-selector { display: flex; gap: 6px; }
+
+    .status-pill {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid var(--border2);
+      background: none;
+      color: var(--text2);
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+    .status-pill:hover { border-color: var(--accent); color: var(--accent); }
+    .status-pill.active-todo { background: var(--surface3); color: var(--text); border-color: var(--border2); }
+    .status-pill.active-progress { background: var(--blue-dim); color: var(--blue); border-color: var(--blue); }
+    .status-pill.active-done { background: var(--green-dim); color: var(--green); border-color: var(--green); }
+
+    .empty-state { text-align: center; padding: 48px 24px; color: var(--text3); }
+    .empty-state .empty-icon { font-size: 32px; margin-bottom: 12px; }
+    .empty-state p { font-size: 13px; line-height: 1.6; }
+    .empty-state strong { color: var(--text2); }
+
+    /* RIGHT PANEL */
+    #chat-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+    }
+
+    .chat-header {
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .chat-header h2 { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+    .chat-header p { font-size: 12px; color: var(--text3); }
+
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    #messages::-webkit-scrollbar { width: 4px; }
+    #messages::-webkit-scrollbar-track { background: transparent; }
+    #messages::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+    .message { display: flex; gap: 12px; }
+    .message.user { flex-direction: row-reverse; align-self: flex-end; max-width: 80%; }
+    .message.ai { max-width: 88%; }
+
+    .avatar {
+      width: 28px; height: 28px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .avatar-user { background: var(--accent-dim); color: var(--accent); }
+    .avatar-ai { background: rgba(108,99,255,0.1); color: #9b8fff; border: 1px solid rgba(108,99,255,0.2); }
+
+    .bubble {
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.65;
+      word-break: break-word;
+    }
+    .message.user .bubble {
+      background: var(--accent-dim);
+      border: 1px solid rgba(108,99,255,0.25);
+      color: var(--text);
+      border-bottom-right-radius: 4px;
+    }
+    .message.ai .bubble {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-bottom-left-radius: 4px;
+    }
+
+    .typing-indicator { display: flex; gap: 4px; padding: 4px 2px; align-items: center; }
+    .typing-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--text3);
+      animation: bounce 1.2s infinite;
+    }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes bounce {
+      0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+      30% { transform: translateY(-5px); opacity: 1; }
+    }
+
+    .welcome-msg {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      max-width: 440px;
+      margin: auto;
+      text-align: center;
+      padding: 40px 24px;
+    }
+    .welcome-msg .wicon { font-size: 38px; margin-bottom: 6px; }
+    .welcome-msg h3 { font-size: 18px; font-weight: 600; color: var(--text); letter-spacing: -0.02em; }
+    .welcome-msg p { font-size: 13px; color: var(--text2); line-height: 1.7; }
+    .suggestions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 14px; }
+    .suggestion-chip {
+      font-size: 12px;
+      padding: 6px 14px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      color: var(--text2);
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: inherit;
+    }
+    .suggestion-chip:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+
+    .chat-input-area {
+      padding: 16px 24px 20px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .input-wrapper {
+      display: flex;
+      gap: 10px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 10px 10px 16px;
+      transition: border-color 0.15s;
+    }
+    .input-wrapper:focus-within { border-color: var(--accent); }
+
+    #chat-input {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      color: var(--text);
+      font-size: 13px;
+      font-family: inherit;
+      resize: none;
+      line-height: 1.5;
+      max-height: 120px;
+      min-height: 22px;
+    }
+    #chat-input::placeholder { color: var(--text3); }
+
+    #send-btn {
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      background: var(--accent);
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      align-self: flex-end;
+      transition: background 0.15s, transform 0.1s;
+    }
+    #send-btn:hover { background: var(--accent-hover); }
+    #send-btn:active { transform: scale(0.95); }
+    #send-btn:disabled { background: var(--surface3); cursor: not-allowed; }
+    #send-btn svg { fill: white; }
+
+    .input-hint { font-size: 11px; color: var(--text3); margin-top: 8px; text-align: center; }
+
+    /* RESPONSIVE */
+    @media (max-width: 720px) {
+      #app { flex-direction: column; }
+      #tasks-panel { width: 100%; max-width: 100%; height: 45vh; border-right: none; border-bottom: 1px solid var(--border); }
+      #chat-panel { height: 55vh; }
+    }
+
+    * { scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <!-- LEFT: Task List -->
+  <aside id="tasks-panel">
+    <div class="panel-header">
+      <div class="panel-title">
+        <div class="logo">⚡</div>
+        <div>
+          <h1>TaskFlow</h1>
+          <span>AI-powered tasks</span>
+        </div>
+      </div>
+      <button class="clear-btn" onclick="clearAllTasks()">Clear all</button>
+    </div>
+    <div id="tasks-list">
+      <div class="empty-state">
+        <div class="empty-icon">📋</div>
+        <p>No tasks yet.<br /><strong>Chat with the AI</strong> to create your first task.</p>
+      </div>
+    </div>
+  </aside>
+
+  <!-- RIGHT: Chat -->
+  <main id="chat-panel">
+    <div class="chat-header">
+      <h2>AI Assistant</h2>
+      <p>Powered by Llama 3.3 · Cloudflare Workers AI</p>
+    </div>
+
+    <div id="messages">
+      <div class="welcome-msg" id="welcome">
+        <div class="wicon">✨</div>
+        <h3>What would you like to get done?</h3>
+        <p>Describe your tasks in plain English and I'll organize them for you. Update statuses, ask about your progress, or just chat.</p>
+        <div class="suggestions">
+          <button class="suggestion-chip" onclick="useSuggestion(this)">Plan my week</button>
+          <button class="suggestion-chip" onclick="useSuggestion(this)">Add a high-priority bug fix</button>
+          <button class="suggestion-chip" onclick="useSuggestion(this)">What tasks are due soon?</button>
+          <button class="suggestion-chip" onclick="useSuggestion(this)">Create tasks for a product launch</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-input-area">
+      <div class="input-wrapper">
+        <textarea
+          id="chat-input"
+          placeholder="Message AI..."
+          rows="1"
+          onkeydown="handleKey(event)"
+          oninput="autoResize(this)"
+        ></textarea>
+        <button id="send-btn" onclick="sendMessage()" title="Send">
+          <svg width="14" height="14" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+        </button>
+      </div>
+      <p class="input-hint">Enter to send &nbsp;·&nbsp; Shift+Enter for new line</p>
+    </div>
+  </main>
+</div>
+
+<script>
+  let chatHistory = [];
+  let allTasks = [];
+
+  // ── Task rendering ──────────────────────────────────────────
+
+  function formatDueDate(dueDate) {
+    const d = new Date(dueDate + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diff = Math.round((d - today) / 86400000);
+    let label;
+    if (diff === 0) label = 'Today';
+    else if (diff === 1) label = 'Tomorrow';
+    else if (diff === -1) label = 'Yesterday';
+    else if (diff > 1 && diff < 7) label = d.toLocaleDateString('en-US', { weekday: 'short' });
+    else label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return { label, overdue: diff < 0 };
+  }
+
+  function renderTasks(tasks) {
+    allTasks = tasks;
+    const container = document.getElementById('tasks-list');
+
+    if (!tasks || tasks.length === 0) {
+      container.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><p>No tasks yet.<br /><strong>Chat with the AI</strong> to create your first task.</p></div>';
+      return;
+    }
+
+    const groups = { 'todo': [], 'in-progress': [], 'done': [] };
+    for (const t of tasks) {
+      if (groups[t.status]) groups[t.status].push(t);
+    }
+
+    const groupMeta = [
+      { key: 'todo', label: 'Todo', dotClass: 'dot-todo' },
+      { key: 'in-progress', label: 'In Progress', dotClass: 'dot-progress' },
+      { key: 'done', label: 'Done', dotClass: 'dot-done' },
+    ];
+
+    container.innerHTML = groupMeta.map(({ key, label, dotClass }) => {
+      const group = groups[key];
+      if (!group.length) return '';
+      return `<div class="task-group">
+        <div class="group-header">
+          <div class="group-dot ${dotClass}"></div>
+          <span class="group-label">${label}</span>
+          <span class="group-count">${group.length}</span>
+        </div>
+        ${group.map(taskCard).join('')}
+      </div>`;
+    }).join('');
+  }
+
+  function taskCard(task) {
+    const due = task.dueDate ? formatDueDate(task.dueDate) : null;
+    const doneClass = task.status === 'done' ? 'done-card' : '';
+    const statusBtnClass = task.status === 'done' ? 'done' : task.status === 'in-progress' ? 'in-progress' : '';
+    const desc = task.description ? `<p class="task-desc">${escHtml(task.description)}</p>` : '';
+
+    const statusPills = [
+      { val: 'todo', label: 'Todo', activeKey: 'todo' },
+      { val: 'in-progress', label: 'In Progress', activeKey: 'progress' },
+      { val: 'done', label: 'Done', activeKey: 'done' },
+    ].map(s => {
+      const active = task.status === s.val ? `active-${s.activeKey}` : '';
+      return `<button class="status-pill ${active}" onclick="updateStatus('${task.id}','${s.val}',event)">${s.label}</button>`;
+    }).join('');
+
+    return `<div class="task-card ${doneClass}" id="card-${task.id}" onclick="toggleExpand('${task.id}')">
+      <div class="task-card-top">
+        <button class="task-status-btn ${statusBtnClass}" onclick="cycleStatus('${task.id}',event)" title="Cycle status"></button>
+        <div class="task-content">
+          <div class="task-title">${escHtml(task.title)}</div>
+          <div class="task-meta">
+            <span class="priority-badge priority-${task.priority}">${task.priority}</span>
+            ${due ? `<span class="due-date ${due.overdue ? 'overdue' : ''}">📅 ${due.label}</span>` : ''}
+          </div>
+        </div>
+      </div>
+      <div class="task-expand">
+        ${desc}
+        <div class="status-selector">${statusPills}</div>
+      </div>
+    </div>`;
+  }
+
+  function escHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function toggleExpand(id) {
+    const card = document.getElementById('card-' + id);
+    if (card) card.classList.toggle('expanded');
+  }
+
+  async function cycleStatus(id, e) {
+    e.stopPropagation();
+    const task = allTasks.find(t => t.id === id);
+    if (!task) return;
+    const next = { 'todo': 'in-progress', 'in-progress': 'done', 'done': 'todo' }[task.status];
+    await patchTask(id, { status: next });
+  }
+
+  async function updateStatus(id, status, e) {
+    e.stopPropagation();
+    await patchTask(id, { status });
+  }
+
+  async function patchTask(id, updates) {
+    try {
+      const r = await fetch(`/api/tasks/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      const task = await r.json();
+      const idx = allTasks.findIndex(t => t.id === id);
+      if (idx !== -1) allTasks[idx] = task;
+      renderTasks([...allTasks]);
+    } catch (err) { console.error(err); }
+  }
+
+  async function clearAllTasks() {
+    if (!confirm('Delete all tasks? This cannot be undone.')) return;
+    await fetch('/api/tasks', { method: 'DELETE' });
+    renderTasks([]);
+  }
+
+  async function loadTasks() {
+    try {
+      const r = await fetch('/api/tasks');
+      const tasks = await r.json();
+      renderTasks(tasks);
+    } catch (err) { console.error(err); }
+  }
+
+  // ── Chat ───────────────────────────────────────────────────
+
+  function appendMessage(role, content) {
+    const welcome = document.getElementById('welcome');
+    if (welcome) welcome.remove();
+
+    const container = document.getElementById('messages');
+    const div = document.createElement('div');
+    div.className = `message ${role}`;
+
+    const icon = role === 'user' ? '👤' : '⚡';
+    div.innerHTML = `
+      <div class="avatar avatar-${role === 'user' ? 'user' : 'ai'}">${icon}</div>
+      <div class="bubble">${formatContent(content)}</div>`;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function formatContent(text) {
+    return escHtml(text)
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/`(.*?)`/g, '<code style="font-family:\'JetBrains Mono\',monospace;font-size:12px;background:var(--surface3);padding:1px 5px;border-radius:3px;">$1</code>')
+      .replace(/\n/g, '<br>');
+  }
+
+  function showTyping() {
+    const welcome = document.getElementById('welcome');
+    if (welcome) welcome.remove();
+
+    const container = document.getElementById('messages');
+    const div = document.createElement('div');
+    div.className = 'message ai';
+    div.id = 'typing-indicator';
+    div.innerHTML = `
+      <div class="avatar avatar-ai">⚡</div>
+      <div class="bubble">
+        <div class="typing-indicator">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+      </div>`;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function removeTyping() {
+    const el = document.getElementById('typing-indicator');
+    if (el) el.remove();
+  }
+
+  async function sendMessage() {
+    const input = document.getElementById('chat-input');
+    const message = input.value.trim();
+    if (!message) return;
+
+    input.value = '';
+    autoResize(input);
+    document.getElementById('send-btn').disabled = true;
+
+    appendMessage('user', message);
+    showTyping();
+    chatHistory.push({ role: 'user', content: message });
+
+    try {
+      const r = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, history: chatHistory.slice(-20) }),
+      });
+      const data = await r.json();
+      removeTyping();
+      appendMessage('ai', data.reply);
+      chatHistory.push({ role: 'assistant', content: data.reply });
+      if (data.tasks) renderTasks(data.tasks);
+    } catch (err) {
+      removeTyping();
+      appendMessage('ai', 'Something went wrong. Please try again.');
+      console.error(err);
+    } finally {
+      document.getElementById('send-btn').disabled = false;
+      input.focus();
+    }
+  }
+
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }
+
+  function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+  }
+
+  function useSuggestion(btn) {
+    const input = document.getElementById('chat-input');
+    input.value = btn.textContent;
+    autoResize(input);
+    input.focus();
+  }
+
+  loadTasks();
+</script>
+</body>
+</html>
