@@ -15,39 +15,81 @@ type AppContext = Context<{ Bindings: Env }>;
 const app = new Hono<{ Bindings: Env }>();
 
 const SYSTEM_PROMPT = (tasksJson: string) => `\
-You are a productivity assistant for a task manager app. You help users manage their tasks through natural conversation.
+You are the backend of a task manager app. You receive user messages and output task operations as JSON.
 
-Current task list (JSON):
+You ARE the task management system. When a user says "add a task", you add it. You do not need any external tools.
+
+OUTPUT RULE: Every single response must be a raw JSON object. No prose, no markdown, no explanation — only JSON.
+
+JSON format:
+{"actions":[...],"reply":"..."}
+
+"actions" is an array of zero or more operations:
+  Create: {"action":"create","title":"...","description":"...","priority":"low|medium|high","dueDate":"YYYY-MM-DD"}
+  Update: {"action":"update","id":"EXACT_ID","status":"todo|in-progress|done","priority":"low|medium|high","title":"..."}
+  Delete: {"action":"delete","id":"EXACT_ID"}
+
+"reply" is a short, friendly confirmation or answer shown in the chat UI.
+
+Current tasks in the system:
 ${tasksJson}
 
-You operate in two modes:
+Today's date: ${new Date().toISOString().slice(0, 10)}
 
-MODE 1 — Task operations (create, update, delete):
-If the user wants to create, update, or delete tasks, respond with ONLY this JSON block (no other text before or after):
-\`\`\`json
-{"actions":[...], "reply":"..."}
-\`\`\`
+Examples:
+User: "add a high priority task to fix the login bug"
+Output: {"actions":[{"action":"create","title":"Fix login bug","description":"Resolve the authentication issue preventing users from logging in","priority":"high"}],"reply":"Added \\"Fix login bug\\" as a high-priority task!"}
 
-Where "actions" is an array of operations. Each operation has an "action" field:
-- Create: { "action": "create", "title": "...", "description": "...", "priority": "low|medium|high", "dueDate": "YYYY-MM-DD" }
-- Update: { "action": "update", "id": "<existing task id>", "status": "todo|in-progress|done", "priority": "...", "title": "..." }
-- Delete: { "action": "delete", "id": "<existing task id>" }
+User: "what are my tasks?"
+Output: {"actions":[],"reply":"You have N tasks: [list them]"}
 
-And "reply" is a short, friendly confirmation message to show the user.
-
-When creating tasks from a natural description (e.g. "add tasks for my project launch"), infer reasonable titles, descriptions, and priorities.
-When the user says to mark something done or change a status, find the matching task by title/id and update it.
-
-MODE 2 — Conversation / questions:
-If the user is just asking questions, chatting, or wants a summary, respond with plain text only (no JSON block).
-
-Rules:
-- Be concise and productivity-focused
-- Infer priority from urgency words ("urgent", "asap" → high; "whenever" → low)
-- If a due date is mentioned, parse it to YYYY-MM-DD format relative to today (${new Date().toISOString().slice(0, 10)})
-- Never invent task IDs — only use IDs from the current task list above
-- When multiple tasks are requested at once, include all of them in the actions array
+User: "mark the login bug as done"
+Output: {"actions":[{"action":"update","id":"EXACT_ID_FROM_LIST","status":"done"}],"reply":"Marked \\"Fix login bug\\" as done!"}
 `;
+
+type RawAction = Record<string, unknown>;
+
+function extractStr(v: unknown): string {
+  if (typeof v === "string") return v;
+  if (typeof v === "number") return String(v);
+  return "";
+}
+
+function normalizeActions(raw: unknown): RawAction[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((op) => {
+    if (typeof op !== "object" || op === null) return null;
+    let o = { ...(op as RawAction) };
+
+    // If the AI packed fields into a nested "task" or "data" object, flatten it
+    for (const key of ["task", "data", "fields", "details"]) {
+      if (typeof o[key] === "object" && o[key] !== null) {
+        o = { ...o, ...(o[key] as RawAction) };
+        delete o[key];
+      }
+    }
+
+    // Normalize action verb
+    const verb = String(o.action ?? "").toLowerCase();
+    let action = verb;
+    if (verb.includes("add") || verb.includes("creat") || verb.includes("new")) action = "create";
+    else if (verb.includes("updat") || verb.includes("edit") || verb.includes("mark") || verb.includes("chang") || verb.includes("set")) action = "update";
+    else if (verb.includes("delet") || verb.includes("remov") || verb.includes("drop")) action = "delete";
+
+    // Extract and normalize title
+    const title =
+      extractStr(o.title) ||
+      extractStr(o.name) ||
+      extractStr(o.content) ||
+      extractStr(o.summary) ||
+      "Untitled";
+
+    // Normalize priority to lowercase
+    const priority = extractStr(o.priority).toLowerCase() || undefined;
+
+    return { ...o, action, title, ...(priority ? { priority } : {}) };
+  }).filter(Boolean) as RawAction[];
+}
 
 function getOrCreateSessionId(c: AppContext): string {
   let sessionId = getCookie(c, "session_id");
@@ -129,7 +171,10 @@ app.post("/api/chat", async (c) => {
       role: m.role as "user" | "assistant",
       content: m.content,
     })),
-    { role: "user" as const, content: message },
+    {
+      role: "user" as const,
+      content: `${message}\n\n[Respond with JSON only: {"actions":[...],"reply":"..."}]`,
+    },
   ];
 
   const aiResponse = await c.env.AI.run(
@@ -140,32 +185,44 @@ app.post("/api/chat", async (c) => {
     } as Parameters<Ai["run"]>[1]
   );
 
-  const rawText =
-    typeof aiResponse === "object" && aiResponse !== null && "response" in aiResponse
-      ? (aiResponse as { response: string }).response
-      : String(aiResponse);
+  // Workers AI may return response as a pre-parsed object or as a string
+  const aiObj = (typeof aiResponse === "object" && aiResponse !== null)
+    ? (aiResponse as Record<string, unknown>)
+    : null;
+  const responseField = aiObj?.response;
 
-  const jsonMatch = rawText.match(/```json\s*([\s\S]*?)```/);
-  let reply = rawText;
+  let parsed: { actions?: unknown[]; reply?: string } | null = null;
+
+  if (typeof responseField === "object" && responseField !== null) {
+    // Workers AI already parsed the JSON for us
+    parsed = responseField as { actions?: unknown[]; reply?: string };
+  } else {
+    // String response — try to extract JSON from code block or raw
+    const text = typeof responseField === "string" ? responseField
+      : typeof aiResponse === "string" ? aiResponse : "";
+    const codeMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    const jsonMatch = text.match(/\{[\s\S]*"(?:actions|reply)"[\s\S]*\}/);
+    const jsonStr = codeMatch ? codeMatch[1] : jsonMatch ? jsonMatch[0] : null;
+    if (jsonStr) {
+      try { parsed = JSON.parse(jsonStr); } catch { /* fall through */ }
+    }
+  }
+
+  let reply = parsed?.reply ?? "";
   let updatedTasks: unknown[] = tasks;
 
-  if (jsonMatch) {
-    try {
-      const parsed = JSON.parse(jsonMatch[1]) as {
-        actions?: unknown[];
-        reply?: string;
-      };
-      if (parsed.reply) reply = parsed.reply;
-      if (Array.isArray(parsed.actions) && parsed.actions.length > 0) {
-        const bulkResp = await doFetch(stub, "/tasks/bulk", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(parsed.actions),
-        });
-        updatedTasks = await bulkResp.json<unknown[]>();
-      }
-    } catch {
-      reply = rawText.replace(/```json[\s\S]*?```/g, "").trim();
+  if (parsed) {
+    const actions = normalizeActions(parsed.actions);
+    if (actions.length > 0) {
+      const bulkResp = await doFetch(stub, "/tasks/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(actions),
+      });
+      updatedTasks = await bulkResp.json<unknown[]>();
+    } else {
+      const refreshResp = await doFetch(stub, "/tasks");
+      updatedTasks = await refreshResp.json<unknown[]>();
     }
   } else {
     const refreshResp = await doFetch(stub, "/tasks");
