@@ -71,17 +71,28 @@ function normalizeActions(raw: unknown): RawAction[] {
 
     // Normalize action verb
     const verb = String(o.action ?? "").toLowerCase();
-    let action = verb;
-    if (verb.includes("add") || verb.includes("creat") || verb.includes("new")) action = "create";
-    else if (verb.includes("updat") || verb.includes("edit") || verb.includes("mark") || verb.includes("chang") || verb.includes("set")) action = "update";
-    else if (verb.includes("delet") || verb.includes("remov") || verb.includes("drop")) action = "delete";
+    let action: string;
+    if (verb.includes("delet") || verb.includes("remov") || verb.includes("drop")) {
+      action = "delete";
+    } else if (verb.includes("updat") || verb.includes("edit") || verb.includes("mark") || verb.includes("chang") || verb.includes("set")) {
+      action = "update";
+    } else if (verb.includes("add") || verb.includes("creat") || verb.includes("new")) {
+      action = "create";
+    } else {
+      // Unknown verb — infer from presence of an id field
+      action = (typeof o.id === "string" && o.id.length > 0) ? "update" : "create";
+    }
 
-    // Extract and normalize title
+    // Extract and normalize title — cover every field name the model might use
     const title =
       extractStr(o.title) ||
       extractStr(o.name) ||
+      extractStr(o.task) ||
+      extractStr(o.label) ||
       extractStr(o.content) ||
       extractStr(o.summary) ||
+      extractStr(o.text) ||
+      extractStr(o.description) ||
       "Untitled";
 
     // Normalize priority to lowercase
