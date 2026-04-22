@@ -77,4 +77,4 @@ Browser
 
 ---
 
-> _Screenshot placeholder — add a screenshot of the app here_
+![TaskFlow AI screenshot](screenshot.png)
