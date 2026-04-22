@@ -2,6 +2,8 @@
 
 An AI-powered task manager built on Cloudflare's developer platform — create, update, and query tasks through natural language chat.
 
+![TaskFlow AI screenshot](screenshot.png)
+
 **Live demo:** https://cf-ai-taskflow.alexmekhail.workers.dev
 
 ## Tech Stack
@@ -76,5 +78,3 @@ Browser
 **Durable Objects** provide strongly-consistent, per-user storage with a built-in fetch handler, making them a natural fit for session-scoped state without a separate database.
 
 ---
-
-![TaskFlow AI screenshot](screenshot.png)
